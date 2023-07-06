@@ -13,14 +13,32 @@ const http = require('http');
 
             GET /users => buscando usuários no back-end
             POST /users => criar um usuário no back-end
+
+    Stateful - Stateless 
+
+    Cabeçalhos (requisição, resposta) => metadados
 */
+
+const users = [
+
+]
+
 const server = http.createServer((req, res) => {
     const { method, url } = req
+
     //early return
     if (method === 'GET' && url === '/users'){
-        return res.end('Listagem de usuários')
+        return res
+        .setHeader('Content-Type', 'application/json')
+        .end(JSON.stringify(users))
     }
     if (method === 'POST' && url === '/users'){
+        users.push({
+            id: 1,
+            name: 'Yuri Lincoln',
+            email: 'yurilincoln.tech@gmail.com',
+        })
+
         return res.end('Criação de usuários')
     }
     
