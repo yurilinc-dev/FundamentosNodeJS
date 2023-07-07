@@ -14,7 +14,7 @@ const http = require('http');
             GET /users => buscando usuários no back-end
             POST /users => criar um usuário no back-end
 
-    Stateful - Stateless 
+Stateful - Stateless
 
     Cabeçalhos (requisição, resposta) => metadados
 */
