@@ -1,113 +1,103 @@
-// Criar usuários
-// Listar usuários
-// Editar usuários
-// Remover usuários
-
-/* GET, POST, PUT, DELETE, PATCH
-GET = Buscar uma informação do back-end
-POST = Ao criar uma informação no back-end
-PUT = Editar ou atualizar um recurso no back-end
-PATCH = Atualizar uma informação unica ou especifica de um recurso no back-end
-DELETE = Como ja diz no back-end
-
-GET /users => buscando usuários no back-end
-POST /users => criar um usuário no back-end
-
-Stateful - Stateless
-
-Cabeçalhos (requisição, resposta) => metadados
-*/
-
-/*
 const http = require('http');
-const users = []
-const server = http.createServer(async (req, res) => {
-    const { method, url } = req
+const path = require('path');
+const crypto = require('crypto');
+const fs = require('fs').promises;
 
-    const buffers = []
+const databasePath = path.join(__dirname, 'database.json');
 
-    for await (const chunk of req) {
-        buffers.push(chunk)
-    }
 
+class Database {
+  constructor() {
+    this.database = {};
+
+    fs.readFile(databasePath, 'utf8').then(data =>{
+        this.database = JSON.parse(data)
+    })
+    .catch(() => {
+        this.persist()
+    })
+  }
+
+  async persist() {
     try {
-       req.body = JSON.parse(Buffer.concat(buffers).toString());
-    } catch (e){
-        req.body = null
+      const data = JSON.stringify(this.database);
+      await fs.writeFile(databasePath, data);
+      console.log('Data persisted successfully.');
+    } catch (error) {
+      console.error('Error writing to file:', error);
     }
-    
+  }
 
+  select(table) {
+    const data = this.database[table] ?? [];
+    return data;
+  }
 
-
-    //early return
-    if (method === 'GET' && url === '/users') {
-        return res
-            .setHeader('Content-Type', 'application/json')
-            .end(JSON.stringify(users))
+  insert(table, data) {
+    if (Array.isArray(this.database[table])) {
+      this.database[table].push(data);
+    } else {
+      this.database[table] = [data];
     }
-    if (method === 'POST' && url === '/users') {
-        const { name, email } = req.body
+    this.persist();
+    return data;
+  }
+}
 
-        users.push({
-            id: 1,
-            name,
-            email,
-        })
-
-        return res.writeHead(201).end()
-    }
-
-    return res.writeHead(404).end()
-})
-
-server.listen(3333);*/
-
-const http = require('http');
-
-const users = [];
+const database = new Database();
 
 const server = http.createServer(async (req, res) => {
-    const { method, url } = req;
+  const { method, url } = req;
 
-    const buffers = [];
+  if (method === 'GET' && url === '/users') {
+    const users = database.select('users');
 
-    for await (const chunk of req) {
-        buffers.push(chunk);
-    }
-
+    res.setHeader('Content-Type', 'application/json');
+    res.end(JSON.stringify(users));
+  } else if (method === 'POST' && url === '/users') {
     try {
-        req.body = JSON.parse(Buffer.concat(buffers).toString());
-    } catch (e) {
-        req.body = null;
+      const body = await getRequestBody(req);
+      const { name, email } = JSON.parse(body);
+
+      if (!name || !email) {
+        res.writeHead(400);
+        res.end('Missing name or email');
+        return;
+      }
+
+      const user = {
+        id: crypto.randomUUID(),
+        name,
+        email,
+      };
+      database.insert('users', user);
+
+      res.writeHead(201);
+      res.end();
+    } catch (error) {
+      console.error('Error parsing JSON:', error);
+      res.writeHead(400);
+      res.end('Invalid JSON');
     }
-
-    // Early return
-    if (method === 'GET' && url === '/users') {
-        return res
-            .setHeader('Content-Type', 'application/json')
-            .end(JSON.stringify(users));
-    }
-    if (method === 'POST' && url === '/users') {
-        if (req.body === null) {
-            return res.writeHead(400).end('Invalid JSON');
-        }
-
-        const { name, email } = req.body;
-
-        if (!name || !email) {
-            return res.writeHead(400).end('Missing name or email');
-        }
-
-        users.push({
-            id: 1,
-            name,
-            email,
-        });
-
-        return res.writeHead(201).end();
-    }
-
-    return res.writeHead(404).end();
+  } else {
+    res.writeHead(404);
+    res.end();
+  }
 });
+
+function getRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', (chunk) => {
+      body += chunk;
+    });
+    req.on('end', () => {
+      resolve(body);
+    });
+    req.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
 
 server.listen(3333);
